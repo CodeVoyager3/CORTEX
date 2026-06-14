@@ -35,8 +35,7 @@ export default function LoginPage() {
       {/* Clerk SignIn — appearance customised to match CORTEX dark theme */}
       <SignIn
         routing="hash"
-        afterSignInUrl="/dashboard"
-        afterSignUpUrl="/dashboard"
+        forceRedirectUrl="/dashboard"
         appearance={{
           variables: {
             colorPrimary: "#7c3aed",
