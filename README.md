@@ -40,9 +40,8 @@ The architecture is divided into two main components: the ingestion pipeline and
 
 ## Tech Stack
 
-- **Frontend:** React.js
-- **Backend API:** Node.js / Express.js
-- **ML & Parsing Pipeline:** Python
+- **Frontend:** Next.js, Tailwind CSS
+- **Backend API & ML Pipeline:** Python (FastAPI)
 - **AST Parser:** Tree-sitter
 - **Graph Database:** Neo4j
 - **Vector Database:** MongoDB Atlas Vector Search
