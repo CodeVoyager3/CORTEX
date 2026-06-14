@@ -129,7 +129,6 @@ export default function DashboardPage() {
 
             {/* Clerk user button */}
             <UserButton
-              afterSignOutUrl="/"
               appearance={{
                 elements: {
                   avatarBox: 'h-7 w-7 rounded-full ring-2 ring-orange-500/30 ring-offset-1',
