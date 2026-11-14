@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "ts-node index.ts",
+    "dev": "ts-node index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev:api": "ts-node app/api-service/index.ts",
     "dev:webhook": "ts-node app/webhook-service/index.ts",
