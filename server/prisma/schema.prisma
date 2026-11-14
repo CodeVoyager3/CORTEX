@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Installation {
+  id                   String       @id @default(cuid())
+  githubInstallationId BigInt       @unique
+  owner                String
+  createdAt            DateTime     @default(now())
+  repositories         Repository[]
+}
+
+model Repository {
+  id             String      @id @default(cuid())
+  owner          String
+  name           String
+  lastIndexedSha String?
+  installationId String?
+  chunks         CodeChunk[]
+  reviews        PRReview[]
+  installation   Installation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
+
+  @@unique([owner, name])
+  @@index([installationId])
+}
+
+model CodeChunk {
+  id           String   @id  // Format: "filePath::nodeType::symbolName::index"
+  repositoryId String
+  filePath     String
+  symbolName   String
+  nodeType     String        // e.g., function | class | method | import
+  startLine    Int
+  endLine      Int
+  content      String        // Enriched text sent to Pinecone
+  imports      String[]      // Raw import strings mapped from AST
+  calledBy     String[]      // Callee symbol names this chunk invokes (outgoing call edges)
+  
+  repository   Repository    @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  
+  @@index([repositoryId, filePath])
+  @@index([repositoryId, symbolName])
+}
+
+model PRReview {
+  id           String   @id @default(cuid())
+  repositoryId String
+  prNumber     Int
+  status       String   // "pending" | "completed" | "failed"
+  createdAt    DateTime @default(now())
+  issues       Issue[]
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@index([repositoryId])
+}
+
+model Issue {
+  id          String   @id @default(cuid())
+  reviewId    String
+  filePath    String
+  lineNumber  Int
+  description String
+  severity    String   // "low" | "medium" | "high" | "critical"
+
+  review      PRReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+}
