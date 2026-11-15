@@ -161,6 +161,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 // API surface
 // ---------------------------------------------------------------------------
 
+export interface InstallInfo {
+  configured: boolean;
+  installUrl: string | null;
+}
+
+export const getInstall = () => request<InstallInfo>('/api/install-url');
+
 export const getHealth = () =>
   request<HealthInfo>('/api/health', { signal: AbortSignal.timeout(5000) });
 

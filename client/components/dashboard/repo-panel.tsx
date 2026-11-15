@@ -6,6 +6,7 @@ import {
   Loader2, Clock, Trash2, ExternalLink, Info, Globe,
   ChevronDown, ChevronRight, GitPullRequest,
 } from 'lucide-react';
+import { FaGithub } from 'react-icons/fa';
 import { type ActivityItem } from './activity-feed';
 import {
   type ApiRepo,
@@ -16,6 +17,7 @@ import {
   getRepo,
   deleteRepo,
   triggerReview,
+  getInstall,
 } from '@/lib/api';
 
 type RepoStatus = 'indexed' | 'pending' | 'error';
@@ -83,6 +85,15 @@ export function RepoPanel({ onActivity }: RepoPanelProps) {
   const [indexState, setIndexState] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [indexMessage, setIndexMessage] = useState('');
   const [sessionFailed, setSessionFailed] = useState<Record<string, true>>({});
+  const [installUrl, setInstallUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    getInstall().then((res) => {
+      if (res.configured && res.installUrl) {
+        setInstallUrl(res.installUrl);
+      }
+    }).catch(() => {});
+  }, []);
 
   // Expanded repo detail + PR review flow
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -319,6 +330,36 @@ export function RepoPanel({ onActivity }: RepoPanelProps) {
 
           {/* Left: ingestion form */}
           <div className="xl:border-r border-b xl:border-b-0 border-neutral-100 dark:border-neutral-800/60 px-6 py-6 flex flex-col gap-6 bg-neutral-50/50 dark:bg-neutral-900/20">
+            {/* GitHub App Installation Banner */}
+            {installUrl && (
+              <div className="p-4 rounded-xl bg-gradient-to-br from-neutral-900 to-neutral-800 text-white dark:from-neutral-900/90 dark:to-neutral-950/80 border border-neutral-700/60 dark:border-neutral-800 shadow-md">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-orange-400 flex-shrink-0 mt-0.5">
+                    <FaGithub className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h3 className="text-xs font-bold text-white tracking-tight">Connect GitHub App</h3>
+                      <span className="text-[10px] bg-orange-500/30 text-orange-300 font-semibold px-1.5 py-0.2 rounded border border-orange-500/40">Recommended</span>
+                    </div>
+                    <p className="text-[11px] text-neutral-300 dark:text-neutral-400 mt-1 leading-relaxed">
+                      Install CORTEX on your repositories to enable automated PR reviews and blast radius analysis on every commit.
+                    </p>
+                    <a
+                      href={installUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-lg transition-all shadow-sm"
+                    >
+                      <FaGithub className="w-3.5 h-3.5" />
+                      Install on GitHub
+                      <ExternalLink className="w-3 h-3 opacity-70 ml-0.5" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <h2 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-3">
                 Index a Repository
