@@ -272,28 +272,95 @@ export class RAGService {
     // Step 2: Clear any partial/stale index so re-runs update calledBy edges
     await this.clearRepositoryIndex(repo.id);
 
-    // Step 3: Parse and embed each supported file
-    let totalChunks = 0;
+    // Step 3: Fast in-memory AST parsing across all files
+    const allFileChunks: Array<{ filePath: string; chunk: CodeChunk; vectorId: string; embedText: string }> = [];
 
     for (const file of files) {
       const ext = getExtension(file.path);
       if (!SUPPORTED_EXTENSIONS.has(ext)) continue;
 
       const chunks = astParser.parseFile(file.path, file.content, ext);
-      if (chunks.length === 0) continue;
-
-      await this.embedAndUpsertChunks(repo.id, file.path, chunks);
-      totalChunks += chunks.length;
+      for (let i = 0; i < chunks.length; i++) {
+        const c = chunks[i]!;
+        allFileChunks.push({
+          filePath: file.path,
+          chunk: c,
+          vectorId: buildVectorId(file.path, c, i),
+          embedText: buildEmbedText(file.path, c),
+        });
+      }
     }
 
-    // Step 4: Stamp the repository with the indexed commit SHA
+    console.log(`[RAG] Parsed ${allFileChunks.length} chunks across ${files.length} files. Starting global batch embedding...`);
+
+    // Step 4: Embed & upsert in global batches of BATCH_SIZE (up to 96 per API call)
+    if (allFileChunks.length > 0) {
+      const batches = splitIntoBatches(allFileChunks, BATCH_SIZE);
+      const namespace = `repo-${repo.id}`;
+      const index = this.pinecone.index<ChunkMetadata>(this.indexName);
+      const ns = index.namespace(namespace);
+
+      for (let b = 0; b < batches.length; b++) {
+        const batch = batches[b]!;
+
+        // A: Batch Pinecone Inference
+        const embeddingsList = await this.pinecone.inference.embed({
+          model: EMBED_MODEL,
+          inputs: batch.map((item) => item.embedText),
+          parameters: { inputType: 'passage', truncate: 'END' },
+        });
+
+        // B: Batch Upsert to Pinecone
+        const records = batch.map((item, i) => {
+          const embedding = embeddingsList.data[i];
+          if (!embedding || embedding.vectorType !== 'dense') {
+            throw new Error(`Missing dense embedding for chunk ${item.vectorId}`);
+          }
+          return {
+            id: item.vectorId,
+            values: (embedding as { vectorType: 'dense'; values: number[] }).values,
+            metadata: {
+              repositoryId: repo.id,
+              filePath: item.filePath,
+              symbolName: item.chunk.name,
+              nodeType: item.chunk.type,
+              startLine: item.chunk.startLine,
+              endLine: item.chunk.endLine,
+            } satisfies ChunkMetadata,
+          };
+        });
+
+        await ns.upsert({ records });
+
+        // C: Batch insert into PostgreSQL
+        await this.prisma.codeChunk.createMany({
+          data: batch.map((item) => ({
+            id: item.vectorId,
+            repositoryId: repo.id,
+            filePath: item.filePath,
+            symbolName: item.chunk.name,
+            nodeType: item.chunk.type,
+            startLine: item.chunk.startLine,
+            endLine: item.chunk.endLine,
+            content: item.chunk.content,
+            imports: item.chunk.imports,
+            calledBy: item.chunk.calledBy,
+          })),
+          skipDuplicates: true,
+        });
+
+        console.log(`[RAG] Batch ${b + 1}/${batches.length} completed (${batch.length} chunks)`);
+      }
+    }
+
+    // Step 5: Stamp the repository with the indexed commit SHA
     await this.prisma.repository.update({
       where: { id: repo.id },
       data: { lastIndexedSha: headSha },
     });
 
     console.log(
-      `[RAG] Full index complete: ${totalChunks} chunks across ${files.length} files. SHA=${headSha}`,
+      `[RAG] Full index complete: ${allFileChunks.length} chunks across ${files.length} files. SHA=${headSha}`,
     );
   }
 

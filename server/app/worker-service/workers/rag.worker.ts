@@ -11,7 +11,20 @@ import { ragService, type ChangedFile, type RepoFile } from '../services/rag.ser
 const connection = createRedisConnection(true);
 
 const SUPPORTED_EXTENSIONS = new Set(['.js', '.jsx', '.ts', '.tsx', '.py', '.cpp', '.cc', '.cxx']);
-const SKIP_PATH_FRAGMENTS = ['node_modules/', 'dist/', 'build/', '.git/', 'vendor/', 'coverage/'];
+const SKIP_PATH_FRAGMENTS = [
+  'node_modules/',
+  'dist/',
+  'build/',
+  '.git/',
+  'vendor/',
+  'coverage/',
+  '.next/',
+  'out/',
+  '.turbo/',
+  '.output/',
+  'public/',
+  'assets/',
+];
 
 function getExtension(filePath: string): string {
   const idx = filePath.lastIndexOf('.');
@@ -21,6 +34,14 @@ function getExtension(filePath: string): string {
 function shouldSkipPath(relativePath: string): boolean {
   const normalized = relativePath.replace(/\\/g, '/');
   if (normalized.startsWith('.')) return true;
+  if (
+    normalized.endsWith('.d.ts') ||
+    normalized.endsWith('.min.js') ||
+    normalized.endsWith('.bundle.js') ||
+    normalized.endsWith('.map')
+  ) {
+    return true;
+  }
   return SKIP_PATH_FRAGMENTS.some((frag) => normalized.includes(frag));
 }
 
