@@ -198,5 +198,17 @@ export const triggerReview = (owner: string, repo: string, prNumber: number) =>
 export const chat = (question: string) =>
   request<ChatResponse>('/api/chat', { method: 'POST', body: JSON.stringify({ question }) });
 
+export interface SymbolSummary {
+  name: string;
+  nodeType: string;
+  filePath: string;
+  depCount: number;
+}
+
+export const getDependencySymbols = (repoId?: string) =>
+  request<{ symbols: SymbolSummary[] }>(
+    `/api/dependencies/symbols${repoId ? `?repoId=${encodeURIComponent(repoId)}` : ''}`,
+  );
+
 export const getDependencies = (symbol: string) =>
   request<DependenciesResponse>(`/api/dependencies?symbol=${encodeURIComponent(symbol)}`);

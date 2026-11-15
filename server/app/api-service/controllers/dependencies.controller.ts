@@ -128,3 +128,59 @@ export async function getDependencies(req: Request, res: Response): Promise<void
     res.status(500).json({ error: 'Failed to resolve dependencies' });
   }
 }
+
+/**
+ * GET /api/dependencies/symbols?repoId=
+ *
+ * Discovers and returns indexed symbols with outgoing call edges or imports
+ * so the frontend can populate realistic dependency graphs and quick-search chips.
+ */
+export async function listSymbols(req: Request, res: Response): Promise<void> {
+  try {
+    const repoId =
+      typeof req.query.repoId === 'string' && req.query.repoId ? req.query.repoId : undefined;
+    const scope = repoId ? { repositoryId: repoId } : {};
+
+    const chunks = await prisma.codeChunk.findMany({
+      where: scope,
+      select: {
+        symbolName: true,
+        nodeType: true,
+        filePath: true,
+        calledBy: true,
+        imports: true,
+      },
+      take: 200,
+    });
+
+    const symbolMap = new Map<
+      string,
+      { name: string; nodeType: string; filePath: string; depCount: number }
+    >();
+
+    for (const chunk of chunks) {
+      const name = chunk.symbolName?.trim();
+      if (!name || name === 'anonymous' || name === 'default') continue;
+
+      const totalDeps = chunk.calledBy.length + chunk.imports.length;
+      const existing = symbolMap.get(name);
+      if (!existing || totalDeps > existing.depCount) {
+        symbolMap.set(name, {
+          name,
+          nodeType: chunk.nodeType,
+          filePath: chunk.filePath,
+          depCount: totalDeps,
+        });
+      }
+    }
+
+    const sorted = Array.from(symbolMap.values())
+      .sort((a, b) => b.depCount - a.depCount)
+      .slice(0, 30);
+
+    res.json({ symbols: sorted });
+  } catch (error) {
+    console.error('[api] Error in /api/dependencies/symbols:', error);
+    res.status(500).json({ error: 'Failed to list symbols' });
+  }
+}

@@ -6,7 +6,7 @@ import { getInstall } from '../controllers/install.controller';
 import { getHealth } from '../controllers/health.controller';
 import { getJob } from '../controllers/jobs.controller';
 import { chat } from '../controllers/chat.controller';
-import { getDependencies } from '../controllers/dependencies.controller';
+import { getDependencies, listSymbols } from '../controllers/dependencies.controller';
 
 export const apiRouter = Router();
 
@@ -29,4 +29,5 @@ apiRouter.get('/reviews/:id', getReview);
 // Background job status (rag | review), codebase chat, dependency lookup
 apiRouter.get('/jobs/:queue/:id', getJob);
 apiRouter.post('/chat', chat);
+apiRouter.get('/dependencies/symbols', listSymbols);
 apiRouter.get('/dependencies', getDependencies);
