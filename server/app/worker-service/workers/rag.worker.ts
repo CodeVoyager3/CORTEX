@@ -3,6 +3,8 @@ import type { Octokit } from '@octokit/rest';
 import AdmZip from 'adm-zip';
 import { QUEUE_NAMES, createRedisConnection, type RagJobData } from '../../../package/queue';
 import { getOctokit } from '../../../package/github/client';
+import { createAppOctokit } from '../../../package/github/app-auth';
+import { env, githubAppConfigured } from '../../../package/config/env';
 import { prisma, upsertRepository } from '../../../package/db/prisma';
 import { ragService, type ChangedFile, type RepoFile } from '../services/rag.service';
 
@@ -98,11 +100,22 @@ async function runFullIndex(
 ): Promise<void> {
   console.log(`[RAG Worker] Full index (${label}) for ${owner}/${repoName}`);
 
-  const octokit = getOctokit(installationId);
+  let effectiveInstallationId = installationId;
+  if (effectiveInstallationId === undefined && githubAppConfigured) {
+    try {
+      const appOctokit = createAppOctokit();
+      const { data: inst } = await appOctokit.rest.apps.getRepoInstallation({ owner, repo: repoName });
+      if (inst?.id) effectiveInstallationId = inst.id;
+    } catch {
+      // App not installed on repo, will fallback
+    }
+  }
+
+  const octokit = getOctokit(effectiveInstallationId);
   const { ref, sha } = await resolveDefaultBranchHead(octokit, owner, repoName);
 
   const repo = await upsertRepository(owner, repoName);
-  await linkInstallation(repo.id, installationId);
+  await linkInstallation(repo.id, effectiveInstallationId);
 
   const files = await downloadRepositoryFiles(octokit, owner, repoName, ref);
   await ragService.indexFullRepository(owner, repoName, files, sha);

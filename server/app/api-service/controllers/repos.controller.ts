@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
-import { prisma, upsertRepository } from '../../../package/db/prisma';
+import { prisma, upsertRepository, upsertInstallation } from '../../../package/db/prisma';
 import { env, githubAppConfigured } from '../../../package/config/env';
+import { createAppOctokit } from '../../../package/github/app-auth';
 import { ragQueue } from '../queues';
 
 /**
@@ -134,6 +135,26 @@ export async function indexRepo(req: Request, res: Response): Promise<void> {
         select: { githubInstallationId: true },
       });
       if (installation) installationId = Number(installation.githubInstallationId);
+    } else if (githubAppConfigured) {
+      // Dynamic lookup: check if the GitHub App is installed on this repo
+      try {
+        const appOctokit = createAppOctokit();
+        const { data: inst } = await appOctokit.rest.apps.getRepoInstallation({
+          owner: parsed.owner,
+          repo: parsed.name,
+        });
+        if (inst?.id) {
+          installationId = inst.id;
+          const accountLogin = (inst.account && 'login' in inst.account) ? (inst.account as any).login : parsed.owner;
+          const dbInst = await upsertInstallation(inst.id, accountLogin);
+          await prisma.repository.update({
+            where: { id: repo.id },
+            data: { installationId: dbInst.id },
+          });
+        }
+      } catch (err) {
+        console.warn(`[api] Could not resolve App installation for ${parsed.owner}/${parsed.name}:`, (err as Error).message);
+      }
     }
 
     const job = await ragQueue.add('manual-index', {
