@@ -22,6 +22,15 @@ app.use(
   }),
 );
 
+// Health check probes for hosting providers (Render, Railway, Fly.io, etc.)
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
+app.get('/', (_req, res) => {
+  res.status(200).send('CORTEX Server is healthy and running');
+});
+
 // REST API routes: /api/...
 app.use('/api', apiRouter);
 
