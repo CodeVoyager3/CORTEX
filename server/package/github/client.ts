@@ -18,13 +18,14 @@ export function getOctokit(installationId?: number): Octokit {
     return createInstallationOctokit(installationId);
   }
 
-  if (!env.githubToken) {
-    throw new Error(
-      '[github] Cannot authenticate: no installationId with a configured GitHub App, and GITHUB_TOKEN (PAT) is not set.',
-    );
+  const token = env.githubToken?.trim();
+  if (token && token.length > 20 && !token.includes('your_token') && !token.includes('ghp_...')) {
+    if (!patOctokit) patOctokit = new Octokit({ auth: token });
+    return patOctokit;
   }
-  if (!patOctokit) patOctokit = new Octokit({ auth: env.githubToken });
-  return patOctokit;
+
+  // Unauthenticated fallback: Allows indexing any public repository without credentials
+  return new Octokit();
 }
 
 /** Public "Install CORTEX" URL for the GitHub App repo picker. */

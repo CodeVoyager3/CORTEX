@@ -8,8 +8,13 @@ import 'dotenv/config';
  */
 
 function str(name: string): string | undefined {
-  const v = process.env[name];
-  return v !== undefined && v.trim() !== '' ? v : undefined;
+  let v = process.env[name];
+  if (v === undefined || v.trim() === '') return undefined;
+  v = v.trim();
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    v = v.slice(1, -1).trim();
+  }
+  return v !== '' ? v : undefined;
 }
 
 function num(name: string, fallback: number): number {
@@ -21,8 +26,13 @@ function num(name: string, fallback: number): number {
 
 /** PEM private keys are commonly stored in .env with literal `\n` sequences. */
 function pem(name: string): string | undefined {
-  const v = str(name);
-  return v ? v.replace(/\\n/g, '\n') : undefined;
+  let v = process.env[name];
+  if (v === undefined || v.trim() === '') return undefined;
+  v = v.trim();
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    v = v.slice(1, -1).trim();
+  }
+  return v ? v.replace(/\\n/g, '\n').trim() : undefined;
 }
 
 export const env = {
